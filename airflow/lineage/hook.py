@@ -53,8 +53,7 @@ class HookLineageCollector(LoggingMixin):
         self.inputs: list[tuple[Dataset, LineageContext]] = []
         self.outputs: list[tuple[Dataset, LineageContext]] = []
 
-    @staticmethod
-    def create_dataset(dataset_kwargs: dict) -> Dataset:
+    def create_dataset(self, dataset_kwargs: dict) -> Dataset | None:
         """Create a Dataset instance from the given dataset kwargs."""
         if "uri" in dataset_kwargs:
             # Fallback to default factory using the provided URI
@@ -62,27 +61,29 @@ class HookLineageCollector(LoggingMixin):
 
         scheme: str = dataset_kwargs.pop("scheme", None)
         if not scheme:
-            raise ValueError(
+            self.log.debug(
                 "Missing required parameter: either 'uri' or 'scheme' must be provided to create a Dataset."
             )
-
+            return None
         dataset_factory = ProvidersManager().dataset_factories.get(scheme)
         if not dataset_factory:
-            raise ValueError(
-                f"Unsupported scheme: '{scheme}'. Please provide a valid URI to create a Dataset."
+            self.log.debug(
+                "Unsupported scheme: '%s'. Please provide a valid URI to create a Dataset.", scheme
             )
-
+            return None
         return dataset_factory(**dataset_kwargs)
 
     def add_input_dataset(self, dataset_kwargs: dict, hook: LineageContext):
         """Add the input dataset and its corresponding hook execution context to the collector."""
         dataset = self.create_dataset(dataset_kwargs)
-        self.inputs.append((dataset, hook))
+        if dataset:
+            self.inputs.append((dataset, hook))
 
     def add_output_dataset(self, dataset_kwargs: dict, hook: LineageContext):
         """Add the output dataset and its corresponding hook execution context to the collector."""
         dataset = self.create_dataset(dataset_kwargs)
-        self.outputs.append((dataset, hook))
+        if dataset:
+            self.outputs.append((dataset, hook))
 
     @property
     def collected_datasets(self) -> HookLineage:
